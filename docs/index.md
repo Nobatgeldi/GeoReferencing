@@ -9,11 +9,11 @@ Build geospatially accurate worlds in Unreal Engine with the GeoReferencing plug
    - Restart Unreal Engine, then enable **Edit → Plugins → GeoReferencing** and restart when prompted.
 2. **Add the GeoReferencingSystem**
    - Open or create a level.
-   - In **Place Actors**, search for **GeoReferencingSystem** and drag it into the level (one per level).
+   - In **Window → Place Actors**, search for **GeoReferencingSystem** and drag it into the level (one per level).
 3. **Configure your location**
    - Choose **Planet Shape**: `Flat Planet` for local areas, `Round Planet` for planet-scale.
    - Set CRS values:
-     - Flat planet example (New York City): `Projected CRS: EPSG:32618`, `Geographic CRS: EPSG:4326`, `Origin Easting: 583000`, `Origin Northing: 4507000`.
+     - Flat planet example (New York City): `Projected CRS: EPSG:32618`, `Geographic CRS: EPSG:4326`, `Origin Projected Coordinates Easting: 583000`, `Origin Projected Coordinates Northing: 4507000`.
      - Round planet example: `Geographic CRS: EPSG:4326`, `Origin At Planet Center: false`, `Origin Latitude: 0`, `Longitude: 0`, `Altitude: 0`.
 4. **Test conversions**
    - Blueprint flow: `BeginPlay → Get Player Pawn → Get Actor Location → Get GeoReferencingSystem → Engine To Geographic → Print String`.
