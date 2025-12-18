@@ -2,7 +2,7 @@
 	"FileVersion": 3,
 	"Version": 1,
 	"VersionName": "1.0",
-	"FriendlyName": "GeoReferencing COVISART",
+	"FriendlyName": "GeoReferencing",
 	"Description": "GeoReferencing tools for UE worlds",
 	"Category": "Other",
 	"CreatedBy": "Epic Games, Inc.",
