@@ -189,4 +189,4 @@ See LICENSE.md for details.
 
 **Maintained by**: COVISART  
 **Based on**: Epic Games GeoReferencing Plugin  
-**Last Updated**: 2025
+**Last Updated**: December 2024

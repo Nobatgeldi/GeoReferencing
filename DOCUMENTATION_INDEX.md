@@ -200,6 +200,6 @@ Welcome to the GeoReferencing plugin documentation. This index will help you fin
 
 ---
 
-**Last Updated**: 2025  
+**Last Updated**: December 2024  
 **Plugin Version**: 1.0  
 **Maintained by**: COVISART
