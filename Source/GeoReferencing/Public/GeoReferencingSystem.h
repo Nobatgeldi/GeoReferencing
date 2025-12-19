@@ -129,6 +129,38 @@ struct GEOREFERENCING_API FGeoReferencingStats
 };
 
 /**
+ * Structure containing coordinate precision information at a specific location
+ */
+USTRUCT(BlueprintType)
+struct GEOREFERENCING_API FCoordinatePrecision
+{
+	GENERATED_BODY()
+
+	/** Estimated precision at this location in centimeters */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	double PrecisionCentimeters = 0.0;
+
+	/** Whether rebasing is recommended at this location */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	bool bRequiresRebasing = false;
+
+	/** Human-readable recommendation for this location */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	FString Recommendation;
+
+	/** Distance from the engine origin in kilometers */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	double DistanceFromOriginKm = 0.0;
+
+	FCoordinatePrecision()
+		: PrecisionCentimeters(0.0)
+		, bRequiresRebasing(false)
+		, DistanceFromOriginKm(0.0)
+	{
+	}
+};
+
+/**
  * This AInfos enable you to define a correspondance between the UE origin and an actual geographic location on a planet
  * Once done it offers different functions to convert coordinates between UE and Geographic coordinates
  */
@@ -391,6 +423,31 @@ public:
 	*/
 	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Stats")
 	void ResetPerformanceStats();
+
+	// Coordinate Precision
+
+	/**
+	* Get precision information at a specific engine coordinate location
+	* @param EngineCoordinates The engine coordinates to check precision for
+	* @return Precision information including estimated accuracy and rebasing recommendation
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Precision")
+	FCoordinatePrecision GetPrecisionAtLocation(const FVector& EngineCoordinates);
+
+	/**
+	* Get the recommended maximum distance from origin before rebasing (in kilometers)
+	* @return Distance in kilometers at which rebasing should be considered
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Precision")
+	double GetRecommendedRebasingDistanceKm();
+
+	/**
+	* Check if rebasing is recommended at a specific location
+	* @param EngineCoordinates The engine coordinates to check
+	* @return True if rebasing is recommended at this location
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Precision")
+	bool ShouldRebaseAtLocation(const FVector& EngineCoordinates);
 
 
 	// Projected <--> Geographic

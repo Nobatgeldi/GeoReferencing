@@ -29,7 +29,9 @@ public class GeoReferencing : ModuleRules
 				"PROJ",
 				"Projects",
 				"SQLiteCore", 
-				"RHI"
+				"RHI",
+				"Json",
+				"JsonUtilities"
 			}
 		);
 

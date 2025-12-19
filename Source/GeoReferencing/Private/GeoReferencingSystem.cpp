@@ -670,6 +670,82 @@ void AGeoReferencingSystem::ResetPerformanceStats()
 	PerformanceStats = FGeoReferencingStats();
 }
 
+// Coordinate Precision Calculator
+
+FCoordinatePrecision AGeoReferencingSystem::GetPrecisionAtLocation(const FVector& EngineCoordinates)
+{
+	FCoordinatePrecision Precision;
+
+	// Calculate distance from origin in centimeters
+	double DistanceCm = EngineCoordinates.Size();
+	Precision.DistanceFromOriginKm = DistanceCm / 100000.0; // Convert cm to km
+
+	// Calculate precision loss due to floating point representation
+	// UE uses single precision floats for FVector in many cases, but we use double for calculations
+	// Precision degrades as we move away from origin
+	// At 1 km: ~0.01 cm precision
+	// At 10 km: ~0.1 cm precision
+	// At 100 km: ~1 cm precision
+	// At 1000 km: ~10 cm precision
+	
+	const double BaselinePrecision = 0.01; // 0.01 cm at origin
+	const double PrecisionDegradationFactor = 1.0e-5; // Precision loss per cm of distance
+	
+	Precision.PrecisionCentimeters = BaselinePrecision + (DistanceCm * PrecisionDegradationFactor);
+
+	// Determine rebasing threshold
+	// Recommend rebasing when precision exceeds 10 cm (useful for most GIS applications)
+	const double RebasingThresholdCm = 10.0;
+	Precision.bRequiresRebasing = Precision.PrecisionCentimeters > RebasingThresholdCm;
+
+	// Generate recommendation
+	if (!Precision.bRequiresRebasing)
+	{
+		Precision.Recommendation = FString::Printf(
+			TEXT("Precision is good (%.2f cm). No rebasing needed."),
+			Precision.PrecisionCentimeters);
+	}
+	else if (Precision.PrecisionCentimeters < 50.0)
+	{
+		Precision.Recommendation = FString::Printf(
+			TEXT("Precision is degrading (%.2f cm). Consider rebasing soon."),
+			Precision.PrecisionCentimeters);
+	}
+	else if (Precision.PrecisionCentimeters < 100.0)
+	{
+		Precision.Recommendation = FString::Printf(
+			TEXT("Precision is poor (%.2f cm). Rebasing recommended."),
+			Precision.PrecisionCentimeters);
+	}
+	else
+	{
+		Precision.Recommendation = FString::Printf(
+			TEXT("Precision is critical (%.2f cm). Rebasing strongly recommended!"),
+			Precision.PrecisionCentimeters);
+	}
+
+	return Precision;
+}
+
+double AGeoReferencingSystem::GetRecommendedRebasingDistanceKm()
+{
+	// Based on the precision degradation model, calculate the distance where precision reaches 10 cm
+	const double BaselinePrecision = 0.01; // 0.01 cm at origin
+	const double PrecisionDegradationFactor = 1.0e-5;
+	const double RebasingThresholdCm = 10.0;
+	
+	// Solve: RebasingThresholdCm = BaselinePrecision + (DistanceCm * PrecisionDegradationFactor)
+	double DistanceCm = (RebasingThresholdCm - BaselinePrecision) / PrecisionDegradationFactor;
+	double DistanceKm = DistanceCm / 100000.0; // Convert cm to km
+	
+	return DistanceKm;
+}
+
+bool AGeoReferencingSystem::ShouldRebaseAtLocation(const FVector& EngineCoordinates)
+{
+	FCoordinatePrecision Precision = GetPrecisionAtLocation(EngineCoordinates);
+	return Precision.bRequiresRebasing;
+}
 
 void AGeoReferencingSystem::ProjectedToGeographic(const FVector& ProjectedCoordinates, FGeographicCoordinates& GeographicCoordinates)
 {
