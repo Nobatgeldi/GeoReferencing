@@ -50,6 +50,18 @@ FVector FEllipsoid::GeodeticSurfaceNormal(const FVector& ECEFLocation) const
 
 FVector FEllipsoid::GeodeticSurfaceNormal(const FGeographicCoordinates& GeographicCoordinates) const
 {
+	// Handle poles with epsilon check to avoid NaN values
+	constexpr double PoleEpsilon = 1e-10;
+	double AbsLatitude = FMathd::Abs(GeographicCoordinates.Latitude);
+	
+	if (FMathd::Abs(90.0 - AbsLatitude) < PoleEpsilon)
+	{
+		// At poles, return canonical up/down vector
+		return (GeographicCoordinates.Latitude > 0.0) 
+			? FVector(0.0, 0.0, 1.0)  // North pole
+			: FVector(0.0, 0.0, -1.0); // South pole
+	}
+
 	double LongitudeRad = FMathd::DegToRad * GeographicCoordinates.Longitude ;
 	double LatitudeRad = FMathd::DegToRad * GeographicCoordinates.Latitude;
 	double cosLatitude = FMathd::Cos(LatitudeRad);

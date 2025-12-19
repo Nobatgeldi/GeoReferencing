@@ -353,6 +353,154 @@ void AGeoReferencingSystem::GeographicToEngine(const FGeographicCoordinates& Geo
 	}
 }
 
+bool AGeoReferencingSystem::GeographicToEngineWithAccuracy(
+	const FGeographicCoordinates& GeographicCoordinates,
+	FVector& EngineCoordinates,
+	FTransformationAccuracy& OutAccuracy)
+{
+	// Perform the standard transformation
+	GeographicToEngine(GeographicCoordinates, EngineCoordinates);
+
+	// Query accuracy information from PROJ
+	FString SourceCRS = GeographicCRS;
+	FString TargetCRS;
+
+	switch (PlanetShape)
+	{
+		case EPlanetShape::RoundPlanet:
+			TargetCRS = ECEF_EPSG_FSTRING;
+			break;
+		case EPlanetShape::FlatPlanet:
+		default:
+			TargetCRS = ProjectedCRS;
+			break;
+	}
+
+	OutAccuracy = GetTransformationAccuracy(SourceCRS, TargetCRS);
+	return true;
+}
+
+bool AGeoReferencingSystem::GeographicToEngineSafe(
+	const FGeographicCoordinates& GeographicCoordinates,
+	FVector& EngineCoordinates,
+	FGeoReferencingError& OutError)
+{
+	FString ErrorMessage;
+	bool bSuccess = TryGeographicToEngine(GeographicCoordinates, EngineCoordinates, &ErrorMessage);
+	
+	OutError.bHasError = !bSuccess;
+	OutError.ErrorMessage = ErrorMessage;
+	OutError.ErrorCode = bSuccess ? 0 : -1;
+	
+	return bSuccess;
+}
+
+bool AGeoReferencingSystem::TryGeographicToEngine(
+	const FGeographicCoordinates& Geographic,
+	FVector& Engine,
+	FString* OutError)
+{
+	// Validate input coordinates
+	if (Geographic.Latitude < -90.0 || Geographic.Latitude > 90.0)
+	{
+		if (OutError)
+		{
+			*OutError = FString::Printf(TEXT("Invalid latitude: %f. Latitude must be between -90 and 90 degrees."), Geographic.Latitude);
+		}
+		return false;
+	}
+
+	if (Geographic.Longitude < -180.0 || Geographic.Longitude > 180.0)
+	{
+		if (OutError)
+		{
+			*OutError = FString::Printf(TEXT("Invalid longitude: %f. Longitude must be between -180 and 180 degrees."), Geographic.Longitude);
+		}
+		return false;
+	}
+
+	// Check for PROJ context
+	if (!Impl || !Impl->ProjContext)
+	{
+		if (OutError)
+		{
+			*OutError = TEXT("PROJ context not initialized. Please ensure the GeoReferencingSystem is properly configured.");
+		}
+		return false;
+	}
+
+	try
+	{
+		// Perform transformation
+		GeographicToEngine(Geographic, Engine);
+
+		// Check for NaN or infinite values in output
+		if (!FMath::IsFinite(Engine.X) || !FMath::IsFinite(Engine.Y) || !FMath::IsFinite(Engine.Z))
+		{
+			if (OutError)
+			{
+				*OutError = TEXT("Transformation resulted in invalid coordinates (NaN or Inf). This may occur at extreme locations like poles.");
+			}
+			return false;
+		}
+
+		return true;
+	}
+	catch (...)
+	{
+		if (OutError)
+		{
+			*OutError = TEXT("Unexpected error during coordinate transformation.");
+		}
+		return false;
+	}
+}
+
+FTransformationAccuracy AGeoReferencingSystem::GetTransformationAccuracy(
+	const FString& SourceCRS,
+	const FString& TargetCRS)
+{
+	FTransformationAccuracy Accuracy;
+
+	if (!Impl || !Impl->ProjContext)
+	{
+		Accuracy.TransformationMethod = TEXT("Error: PROJ context not initialized");
+		return Accuracy;
+	}
+
+	// Get PROJ transformation object
+	PJ* Projection = Impl->GetPROJProjection(SourceCRS, TargetCRS);
+	if (!Projection)
+	{
+		Accuracy.TransformationMethod = TEXT("Error: Could not create transformation");
+		return Accuracy;
+	}
+
+	// Query accuracy from PROJ (requires PROJ 6.0+)
+	// Note: proj_trans_get_accuracy returns -1 if accuracy is unknown
+	double HorizAccuracy = proj_trans_get_accuracy(Impl->ProjContext, Projection, 1, 0);
+	double VertAccuracy = proj_trans_get_accuracy(Impl->ProjContext, Projection, 0, 1);
+
+	Accuracy.HorizontalAccuracyMeters = HorizAccuracy;
+	Accuracy.VerticalAccuracyMeters = VertAccuracy;
+
+	// Get information about the transformation
+	PJ_PROJ_INFO info = proj_pj_info(Projection);
+	if (info.definition)
+	{
+		Accuracy.TransformationMethod = FString(UTF8_TO_TCHAR(info.definition));
+	}
+
+	// Check if transformation uses grid files
+	Accuracy.bIsGridBased = Accuracy.TransformationMethod.Contains(TEXT("grid")) || 
+	                        Accuracy.TransformationMethod.Contains(TEXT("nadgrid"));
+
+	proj_destroy(Projection);
+
+	return Accuracy;
+}
+
+
 
 void AGeoReferencingSystem::ProjectedToGeographic(const FVector& ProjectedCoordinates, FGeographicCoordinates& GeographicCoordinates)
 {

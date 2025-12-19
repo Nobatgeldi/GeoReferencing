@@ -32,6 +32,65 @@ enum class EPlanetShape : uint8 {
 };
 
 /**
+ * Structure containing information about the accuracy of a coordinate transformation
+ */
+USTRUCT(BlueprintType)
+struct GEOREFERENCING_API FTransformationAccuracy
+{
+	GENERATED_BODY()
+
+	/** Horizontal accuracy of the transformation in meters */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	double HorizontalAccuracyMeters = -1.0;
+
+	/** Vertical accuracy of the transformation in meters */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	double VerticalAccuracyMeters = -1.0;
+
+	/** Whether the transformation uses a grid-based method */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	bool bIsGridBased = false;
+
+	/** Description of the transformation method used */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	FString TransformationMethod;
+
+	FTransformationAccuracy()
+		: HorizontalAccuracyMeters(-1.0)
+		, VerticalAccuracyMeters(-1.0)
+		, bIsGridBased(false)
+	{
+	}
+};
+
+/**
+ * Structure containing error information from a georeferencing operation
+ */
+USTRUCT(BlueprintType)
+struct GEOREFERENCING_API FGeoReferencingError
+{
+	GENERATED_BODY()
+
+	/** Whether an error occurred */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	bool bHasError = false;
+
+	/** Human-readable error message */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	FString ErrorMessage;
+
+	/** Error code from the underlying library (PROJ) */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	int32 ErrorCode = 0;
+
+	FGeoReferencingError()
+		: bHasError(false)
+		, ErrorCode(0)
+	{
+	}
+};
+
+/**
  * This AInfos enable you to define a correspondance between the UE origin and an actual geographic location on a planet
  * Once done it offers different functions to convert coordinates between UE and Geographic coordinates
  */
@@ -197,6 +256,55 @@ public:
 	*/
 	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Transformations")
 	void GeographicToEngine(const FGeographicCoordinates& GeographicCoordinates, FVector& EngineCoordinates);
+
+	/**
+	* Convert a Vector expressed in GEOGRAPHIC CRS to ENGINE space with accuracy information
+	* @param GeographicCoordinates The geographic coordinates to convert
+	* @param EngineCoordinates The resulting engine coordinates
+	* @param OutAccuracy Accuracy information about the transformation
+	* @return True if the transformation was successful, false otherwise
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Transformations")
+	bool GeographicToEngineWithAccuracy(
+		const FGeographicCoordinates& GeographicCoordinates,
+		FVector& EngineCoordinates,
+		FTransformationAccuracy& OutAccuracy);
+
+	/**
+	* Convert a Vector expressed in GEOGRAPHIC CRS to ENGINE space with error reporting
+	* @param GeographicCoordinates The geographic coordinates to convert
+	* @param EngineCoordinates The resulting engine coordinates
+	* @param OutError Error information if the transformation fails
+	* @return True if the transformation was successful, false otherwise
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Transformations")
+	bool GeographicToEngineSafe(
+		const FGeographicCoordinates& GeographicCoordinates,
+		FVector& EngineCoordinates,
+		FGeoReferencingError& OutError);
+
+	/**
+	* Get the accuracy of a transformation between two coordinate reference systems
+	* @param SourceCRS The source CRS (e.g., "EPSG:4326")
+	* @param TargetCRS The target CRS (e.g., "EPSG:4978")
+	* @return Accuracy information about the transformation
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Accuracy")
+	FTransformationAccuracy GetTransformationAccuracy(
+		const FString& SourceCRS,
+		const FString& TargetCRS);
+
+	/**
+	* C++ version: Try to convert geographic coordinates to engine coordinates with optional error message
+	* @param Geographic The geographic coordinates to convert
+	* @param Engine The resulting engine coordinates
+	* @param OutError Optional pointer to receive error message
+	* @return True if the transformation was successful, false otherwise
+	*/
+	bool TryGeographicToEngine(
+		const FGeographicCoordinates& Geographic,
+		FVector& Engine,
+		FString* OutError = nullptr);
 
 
 	// Projected <--> Geographic

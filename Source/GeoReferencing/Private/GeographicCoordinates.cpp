@@ -90,3 +90,54 @@ FText FGeographicCoordinates::AsAngle(double Val, const FNumberFormattingOptions
 		return FText::Format(NSLOCTEXT("GeoReferencing", "AngleDegFmt", "{0}°"), FText::AsNumber(Val, Options));
 	}
 }
+
+// Utility functions for antimeridian handling
+namespace GeoReferencingUtilities
+{
+	/**
+	 * Normalize longitude to the range [-180, 180]
+	 */
+	double NormalizeLongitude(double Longitude)
+	{
+		while (Longitude > 180.0)
+		{
+			Longitude -= 360.0;
+		}
+		while (Longitude < -180.0)
+		{
+			Longitude += 360.0;
+		}
+		return Longitude;
+	}
+
+	/**
+	 * Calculate the shortest longitude difference, accounting for antimeridian crossing
+	 */
+	double LongitudeDifference(double Lon1, double Lon2)
+	{
+		double Diff = Lon2 - Lon1;
+		
+		// Adjust for antimeridian crossing
+		if (Diff > 180.0)
+		{
+			Diff -= 360.0;
+		}
+		else if (Diff < -180.0)
+		{
+			Diff += 360.0;
+		}
+		
+		return Diff;
+	}
+
+	/**
+	 * Interpolate between two longitudes, handling antimeridian crossing
+	 */
+	double InterpolateLongitude(double Lon1, double Lon2, double Alpha)
+	{
+		double Diff = LongitudeDifference(Lon1, Lon2);
+		double Result = Lon1 + Alpha * Diff;
+		return NormalizeLongitude(Result);
+	}
+}
+
