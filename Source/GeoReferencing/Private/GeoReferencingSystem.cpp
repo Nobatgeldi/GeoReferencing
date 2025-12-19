@@ -26,9 +26,17 @@
 #include "Misc/Paths.h"
 #include "UFSProjSupport.h"
 #include "proj.h"
+#include "HAL/PlatformTime.h"
+#include "HAL/CriticalSection.h"
+#include "Misc/ScopeLock.h"
+#include "Async/ParallelFor.h"
+#include "Stats/Stats.h"
 
 THIRD_PARTY_INCLUDES_START
 THIRD_PARTY_INCLUDES_END
+
+// Stat declarations
+DECLARE_CYCLE_STAT(TEXT("GeoReferencing Batch Transform"), STAT_GeoReferencingBatchTransform, STATGROUP_Game);
 
 #define ECEF_EPSG_FSTRING FString(TEXT("EPSG:4978"))
 
@@ -500,6 +508,167 @@ FTransformationAccuracy AGeoReferencingSystem::GetTransformationAccuracy(
 	return Accuracy;
 }
 
+// Batch Transformations
+
+void AGeoReferencingSystem::GeographicToEngineBatch(
+	const TArray<FGeographicCoordinates>& GeographicCoordinates,
+	TArray<FVector>& EngineCoordinates)
+{
+	SCOPE_CYCLE_COUNTER(STAT_GeoReferencingBatchTransform);
+	
+	// Pre-allocate output array for efficiency
+	EngineCoordinates.SetNum(GeographicCoordinates.Num());
+
+	// Track performance
+	double StartTime = FPlatformTime::Seconds();
+
+	// Transform each coordinate
+	for (int32 i = 0; i < GeographicCoordinates.Num(); ++i)
+	{
+		GeographicToEngine(GeographicCoordinates[i], EngineCoordinates[i]);
+	}
+
+	// Update performance stats
+	double ElapsedMicroseconds = (FPlatformTime::Seconds() - StartTime) * 1000000.0;
+	{
+		FScopeLock Lock(&StatsMutex);
+		PerformanceStats.TotalTransformations += GeographicCoordinates.Num();
+		
+		// Update average time
+		if (PerformanceStats.TotalTransformations > 0)
+		{
+			double TotalTime = PerformanceStats.AverageTransformTimeMicroseconds * 
+			                   (PerformanceStats.TotalTransformations - GeographicCoordinates.Num());
+			TotalTime += ElapsedMicroseconds;
+			PerformanceStats.AverageTransformTimeMicroseconds = TotalTime / PerformanceStats.TotalTransformations;
+		}
+
+		// Update max time (per transformation)
+		double PerTransformTime = ElapsedMicroseconds / FMath::Max(1, GeographicCoordinates.Num());
+		if (PerTransformTime > PerformanceStats.MaxTransformTimeMicroseconds)
+		{
+			PerformanceStats.MaxTransformTimeMicroseconds = PerTransformTime;
+		}
+	}
+}
+
+void AGeoReferencingSystem::EngineToGeographicBatch(
+	const TArray<FVector>& EngineCoordinates,
+	TArray<FGeographicCoordinates>& GeographicCoordinates)
+{
+	SCOPE_CYCLE_COUNTER(STAT_GeoReferencingBatchTransform);
+	
+	// Pre-allocate output array for efficiency
+	GeographicCoordinates.SetNum(EngineCoordinates.Num());
+
+	// Track performance
+	double StartTime = FPlatformTime::Seconds();
+
+	// Transform each coordinate
+	for (int32 i = 0; i < EngineCoordinates.Num(); ++i)
+	{
+		EngineToGeographic(EngineCoordinates[i], GeographicCoordinates[i]);
+	}
+
+	// Update performance stats
+	double ElapsedMicroseconds = (FPlatformTime::Seconds() - StartTime) * 1000000.0;
+	{
+		FScopeLock Lock(&StatsMutex);
+		PerformanceStats.TotalTransformations += EngineCoordinates.Num();
+		
+		// Update average time
+		if (PerformanceStats.TotalTransformations > 0)
+		{
+			double TotalTime = PerformanceStats.AverageTransformTimeMicroseconds * 
+			                   (PerformanceStats.TotalTransformations - EngineCoordinates.Num());
+			TotalTime += ElapsedMicroseconds;
+			PerformanceStats.AverageTransformTimeMicroseconds = TotalTime / PerformanceStats.TotalTransformations;
+		}
+
+		// Update max time (per transformation)
+		double PerTransformTime = ElapsedMicroseconds / FMath::Max(1, EngineCoordinates.Num());
+		if (PerTransformTime > PerformanceStats.MaxTransformTimeMicroseconds)
+		{
+			PerformanceStats.MaxTransformTimeMicroseconds = PerTransformTime;
+		}
+	}
+}
+
+void AGeoReferencingSystem::GeographicToEngineBatchParallel(
+	const TArray<FGeographicCoordinates>& Geographic,
+	TArray<FVector>& Engine,
+	int32 NumThreads)
+{
+	// Pre-allocate output array
+	Engine.SetNum(Geographic.Num());
+
+	if (Geographic.Num() == 0)
+	{
+		return;
+	}
+
+	// Track performance
+	double StartTime = FPlatformTime::Seconds();
+
+	// For small batches, use single-threaded version
+	if (Geographic.Num() < 100 || NumThreads <= 1)
+	{
+		GeographicToEngineBatch(Geographic, Engine);
+		return;
+	}
+
+	// Calculate chunk size for each thread
+	const int32 ChunkSize = FMath::CeilToInt(static_cast<float>(Geographic.Num()) / NumThreads);
+
+	// Use ParallelFor for thread-safe parallel execution
+	ParallelFor(NumThreads, [&](int32 ThreadIndex)
+	{
+		const int32 StartIndex = ThreadIndex * ChunkSize;
+		const int32 EndIndex = FMath::Min(StartIndex + ChunkSize, Geographic.Num());
+
+		for (int32 i = StartIndex; i < EndIndex; ++i)
+		{
+			GeographicToEngine(Geographic[i], Engine[i]);
+		}
+	});
+
+	// Update performance stats
+	double ElapsedMicroseconds = (FPlatformTime::Seconds() - StartTime) * 1000000.0;
+	{
+		FScopeLock Lock(&StatsMutex);
+		PerformanceStats.TotalTransformations += Geographic.Num();
+		
+		// Update average time
+		if (PerformanceStats.TotalTransformations > 0)
+		{
+			double TotalTime = PerformanceStats.AverageTransformTimeMicroseconds * 
+			                   (PerformanceStats.TotalTransformations - Geographic.Num());
+			TotalTime += ElapsedMicroseconds;
+			PerformanceStats.AverageTransformTimeMicroseconds = TotalTime / PerformanceStats.TotalTransformations;
+		}
+
+		// Update max time (per transformation)
+		double PerTransformTime = ElapsedMicroseconds / FMath::Max(1, Geographic.Num());
+		if (PerTransformTime > PerformanceStats.MaxTransformTimeMicroseconds)
+		{
+			PerformanceStats.MaxTransformTimeMicroseconds = PerTransformTime;
+		}
+	}
+}
+
+// Performance Monitoring
+
+FGeoReferencingStats AGeoReferencingSystem::GetPerformanceStats() const
+{
+	FScopeLock Lock(&StatsMutex);
+	return PerformanceStats;
+}
+
+void AGeoReferencingSystem::ResetPerformanceStats()
+{
+	FScopeLock Lock(&StatsMutex);
+	PerformanceStats = FGeoReferencingStats();
+}
 
 
 void AGeoReferencingSystem::ProjectedToGeographic(const FVector& ProjectedCoordinates, FGeographicCoordinates& GeographicCoordinates)

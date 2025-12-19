@@ -91,6 +91,44 @@ struct GEOREFERENCING_API FGeoReferencingError
 };
 
 /**
+ * Structure containing performance statistics for georeferencing operations
+ */
+USTRUCT(BlueprintType)
+struct GEOREFERENCING_API FGeoReferencingStats
+{
+	GENERATED_BODY()
+
+	/** Total number of transformations performed since last reset */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	int64 TotalTransformations = 0;
+
+	/** Average transformation time in microseconds */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	double AverageTransformTimeMicroseconds = 0.0;
+
+	/** Maximum transformation time in microseconds */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	double MaxTransformTimeMicroseconds = 0.0;
+
+	/** Number of cache hits (if caching is implemented) */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	int32 CacheHits = 0;
+
+	/** Number of cache misses (if caching is implemented) */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	int32 CacheMisses = 0;
+
+	FGeoReferencingStats()
+		: TotalTransformations(0)
+		, AverageTransformTimeMicroseconds(0.0)
+		, MaxTransformTimeMicroseconds(0.0)
+		, CacheHits(0)
+		, CacheMisses(0)
+	{
+	}
+};
+
+/**
  * This AInfos enable you to define a correspondance between the UE origin and an actual geographic location on a planet
  * Once done it offers different functions to convert coordinates between UE and Geographic coordinates
  */
@@ -305,6 +343,54 @@ public:
 		const FGeographicCoordinates& Geographic,
 		FVector& Engine,
 		FString* OutError = nullptr);
+
+	// Batch Transformations
+
+	/**
+	* Convert multiple geographic coordinates to engine coordinates in a single call (optimized)
+	* @param GeographicCoordinates Array of geographic coordinates to convert
+	* @param EngineCoordinates Output array of engine coordinates
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Transformations|Batch")
+	void GeographicToEngineBatch(
+		const TArray<FGeographicCoordinates>& GeographicCoordinates,
+		TArray<FVector>& EngineCoordinates);
+
+	/**
+	* Convert multiple engine coordinates to geographic coordinates in a single call (optimized)
+	* @param EngineCoordinates Array of engine coordinates to convert
+	* @param GeographicCoordinates Output array of geographic coordinates
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Transformations|Batch")
+	void EngineToGeographicBatch(
+		const TArray<FVector>& EngineCoordinates,
+		TArray<FGeographicCoordinates>& GeographicCoordinates);
+
+	/**
+	* C++ only: Convert multiple geographic coordinates to engine coordinates using parallel processing
+	* @param Geographic Array of geographic coordinates to convert
+	* @param Engine Output array of engine coordinates
+	* @param NumThreads Number of threads to use (default: 4)
+	*/
+	void GeographicToEngineBatchParallel(
+		const TArray<FGeographicCoordinates>& Geographic,
+		TArray<FVector>& Engine,
+		int32 NumThreads = 4);
+
+	// Performance Monitoring
+
+	/**
+	* Get performance statistics for georeferencing operations
+	* @return Statistics including transformation count, average time, and cache performance
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Stats")
+	FGeoReferencingStats GetPerformanceStats() const;
+
+	/**
+	* Reset performance statistics counters
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Stats")
+	void ResetPerformanceStats();
 
 
 	// Projected <--> Geographic
@@ -535,6 +621,10 @@ public:
 
 private:
 	void Initialize();
+
+	// Performance statistics
+	mutable FGeoReferencingStats PerformanceStats;
+	mutable FCriticalSection StatsMutex; // Thread safety for stats updates
 
 private:
 	class FGeoReferencingSystemInternals;
