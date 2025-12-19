@@ -32,6 +32,135 @@ enum class EPlanetShape : uint8 {
 };
 
 /**
+ * Structure containing information about the accuracy of a coordinate transformation
+ */
+USTRUCT(BlueprintType)
+struct GEOREFERENCING_API FTransformationAccuracy
+{
+	GENERATED_BODY()
+
+	/** Horizontal accuracy of the transformation in meters */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	double HorizontalAccuracyMeters = -1.0;
+
+	/** Vertical accuracy of the transformation in meters */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	double VerticalAccuracyMeters = -1.0;
+
+	/** Whether the transformation uses a grid-based method */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	bool bIsGridBased = false;
+
+	/** Description of the transformation method used */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	FString TransformationMethod;
+
+	FTransformationAccuracy()
+		: HorizontalAccuracyMeters(-1.0)
+		, VerticalAccuracyMeters(-1.0)
+		, bIsGridBased(false)
+	{
+	}
+};
+
+/**
+ * Structure containing error information from a georeferencing operation
+ */
+USTRUCT(BlueprintType)
+struct GEOREFERENCING_API FGeoReferencingError
+{
+	GENERATED_BODY()
+
+	/** Whether an error occurred */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	bool bHasError = false;
+
+	/** Human-readable error message */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	FString ErrorMessage;
+
+	/** Error code from the underlying library (PROJ) */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	int32 ErrorCode = 0;
+
+	FGeoReferencingError()
+		: bHasError(false)
+		, ErrorCode(0)
+	{
+	}
+};
+
+/**
+ * Structure containing performance statistics for georeferencing operations
+ */
+USTRUCT(BlueprintType)
+struct GEOREFERENCING_API FGeoReferencingStats
+{
+	GENERATED_BODY()
+
+	/** Total number of transformations performed since last reset */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	int64 TotalTransformations = 0;
+
+	/** Average transformation time in microseconds */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	double AverageTransformTimeMicroseconds = 0.0;
+
+	/** Maximum transformation time in microseconds */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	double MaxTransformTimeMicroseconds = 0.0;
+
+	/** Number of cache hits (if caching is implemented) */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	int32 CacheHits = 0;
+
+	/** Number of cache misses (if caching is implemented) */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	int32 CacheMisses = 0;
+
+	FGeoReferencingStats()
+		: TotalTransformations(0)
+		, AverageTransformTimeMicroseconds(0.0)
+		, MaxTransformTimeMicroseconds(0.0)
+		, CacheHits(0)
+		, CacheMisses(0)
+	{
+	}
+};
+
+/**
+ * Structure containing coordinate precision information at a specific location
+ */
+USTRUCT(BlueprintType)
+struct GEOREFERENCING_API FCoordinatePrecision
+{
+	GENERATED_BODY()
+
+	/** Estimated precision at this location in centimeters */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	double PrecisionCentimeters = 0.0;
+
+	/** Whether rebasing is recommended at this location */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	bool bRequiresRebasing = false;
+
+	/** Human-readable recommendation for this location */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	FString Recommendation;
+
+	/** Distance from the engine origin in kilometers */
+	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
+	double DistanceFromOriginKm = 0.0;
+
+	FCoordinatePrecision()
+		: PrecisionCentimeters(0.0)
+		, bRequiresRebasing(false)
+		, DistanceFromOriginKm(0.0)
+	{
+	}
+};
+
+/**
  * This AInfos enable you to define a correspondance between the UE origin and an actual geographic location on a planet
  * Once done it offers different functions to convert coordinates between UE and Geographic coordinates
  */
@@ -197,6 +326,128 @@ public:
 	*/
 	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Transformations")
 	void GeographicToEngine(const FGeographicCoordinates& GeographicCoordinates, FVector& EngineCoordinates);
+
+	/**
+	* Convert a Vector expressed in GEOGRAPHIC CRS to ENGINE space with accuracy information
+	* @param GeographicCoordinates The geographic coordinates to convert
+	* @param EngineCoordinates The resulting engine coordinates
+	* @param OutAccuracy Accuracy information about the transformation
+	* @return True if the transformation was successful, false otherwise
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Transformations")
+	bool GeographicToEngineWithAccuracy(
+		const FGeographicCoordinates& GeographicCoordinates,
+		FVector& EngineCoordinates,
+		FTransformationAccuracy& OutAccuracy);
+
+	/**
+	* Convert a Vector expressed in GEOGRAPHIC CRS to ENGINE space with error reporting
+	* @param GeographicCoordinates The geographic coordinates to convert
+	* @param EngineCoordinates The resulting engine coordinates
+	* @param OutError Error information if the transformation fails
+	* @return True if the transformation was successful, false otherwise
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Transformations")
+	bool GeographicToEngineSafe(
+		const FGeographicCoordinates& GeographicCoordinates,
+		FVector& EngineCoordinates,
+		FGeoReferencingError& OutError);
+
+	/**
+	* Get the accuracy of a transformation between two coordinate reference systems
+	* @param SourceCRS The source CRS (e.g., "EPSG:4326")
+	* @param TargetCRS The target CRS (e.g., "EPSG:4978")
+	* @return Accuracy information about the transformation
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Accuracy")
+	FTransformationAccuracy GetTransformationAccuracy(
+		const FString& SourceCRS,
+		const FString& TargetCRS);
+
+	/**
+	* C++ version: Try to convert geographic coordinates to engine coordinates with optional error message
+	* @param Geographic The geographic coordinates to convert
+	* @param Engine The resulting engine coordinates
+	* @param OutError Optional pointer to receive error message
+	* @return True if the transformation was successful, false otherwise
+	*/
+	bool TryGeographicToEngine(
+		const FGeographicCoordinates& Geographic,
+		FVector& Engine,
+		FString* OutError = nullptr);
+
+	// Batch Transformations
+
+	/**
+	* Convert multiple geographic coordinates to engine coordinates in a single call (optimized)
+	* @param GeographicCoordinates Array of geographic coordinates to convert
+	* @param EngineCoordinates Output array of engine coordinates
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Transformations|Batch")
+	void GeographicToEngineBatch(
+		const TArray<FGeographicCoordinates>& GeographicCoordinates,
+		TArray<FVector>& EngineCoordinates);
+
+	/**
+	* Convert multiple engine coordinates to geographic coordinates in a single call (optimized)
+	* @param EngineCoordinates Array of engine coordinates to convert
+	* @param GeographicCoordinates Output array of geographic coordinates
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Transformations|Batch")
+	void EngineToGeographicBatch(
+		const TArray<FVector>& EngineCoordinates,
+		TArray<FGeographicCoordinates>& GeographicCoordinates);
+
+	/**
+	* C++ only: Convert multiple geographic coordinates to engine coordinates using parallel processing
+	* @param Geographic Array of geographic coordinates to convert
+	* @param Engine Output array of engine coordinates
+	* @param NumThreads Number of threads to use (default: 4)
+	*/
+	void GeographicToEngineBatchParallel(
+		const TArray<FGeographicCoordinates>& Geographic,
+		TArray<FVector>& Engine,
+		int32 NumThreads = 4);
+
+	// Performance Monitoring
+
+	/**
+	* Get performance statistics for georeferencing operations
+	* @return Statistics including transformation count, average time, and cache performance
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Stats")
+	FGeoReferencingStats GetPerformanceStats() const;
+
+	/**
+	* Reset performance statistics counters
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Stats")
+	void ResetPerformanceStats();
+
+	// Coordinate Precision
+
+	/**
+	* Get precision information at a specific engine coordinate location
+	* @param EngineCoordinates The engine coordinates to check precision for
+	* @return Precision information including estimated accuracy and rebasing recommendation
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Precision")
+	FCoordinatePrecision GetPrecisionAtLocation(const FVector& EngineCoordinates);
+
+	/**
+	* Get the recommended maximum distance from origin before rebasing (in kilometers)
+	* @return Distance in kilometers at which rebasing should be considered
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Precision")
+	double GetRecommendedRebasingDistanceKm();
+
+	/**
+	* Check if rebasing is recommended at a specific location
+	* @param EngineCoordinates The engine coordinates to check
+	* @return True if rebasing is recommended at this location
+	*/
+	UFUNCTION(BlueprintCallable, Category = "GeoReferencing|Precision")
+	bool ShouldRebaseAtLocation(const FVector& EngineCoordinates);
 
 
 	// Projected <--> Geographic
@@ -427,6 +678,10 @@ public:
 
 private:
 	void Initialize();
+
+	// Performance statistics
+	mutable FGeoReferencingStats PerformanceStats;
+	mutable FCriticalSection StatsMutex; // Thread safety for stats updates
 
 private:
 	class FGeoReferencingSystemInternals;

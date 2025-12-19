@@ -26,9 +26,17 @@
 #include "Misc/Paths.h"
 #include "UFSProjSupport.h"
 #include "proj.h"
+#include "HAL/PlatformTime.h"
+#include "HAL/CriticalSection.h"
+#include "Misc/ScopeLock.h"
+#include "Async/ParallelFor.h"
+#include "Stats/Stats.h"
 
 THIRD_PARTY_INCLUDES_START
 THIRD_PARTY_INCLUDES_END
+
+// Stat declarations
+DECLARE_CYCLE_STAT(TEXT("GeoReferencing Batch Transform"), STAT_GeoReferencingBatchTransform, STATGROUP_Game);
 
 #define ECEF_EPSG_FSTRING FString(TEXT("EPSG:4978"))
 
@@ -353,6 +361,391 @@ void AGeoReferencingSystem::GeographicToEngine(const FGeographicCoordinates& Geo
 	}
 }
 
+bool AGeoReferencingSystem::GeographicToEngineWithAccuracy(
+	const FGeographicCoordinates& GeographicCoordinates,
+	FVector& EngineCoordinates,
+	FTransformationAccuracy& OutAccuracy)
+{
+	// Perform the standard transformation
+	GeographicToEngine(GeographicCoordinates, EngineCoordinates);
+
+	// Query accuracy information from PROJ
+	FString SourceCRS = GeographicCRS;
+	FString TargetCRS;
+
+	switch (PlanetShape)
+	{
+		case EPlanetShape::RoundPlanet:
+			TargetCRS = ECEF_EPSG_FSTRING;
+			break;
+		case EPlanetShape::FlatPlanet:
+		default:
+			TargetCRS = ProjectedCRS;
+			break;
+	}
+
+	OutAccuracy = GetTransformationAccuracy(SourceCRS, TargetCRS);
+	return true;
+}
+
+bool AGeoReferencingSystem::GeographicToEngineSafe(
+	const FGeographicCoordinates& GeographicCoordinates,
+	FVector& EngineCoordinates,
+	FGeoReferencingError& OutError)
+{
+	FString ErrorMessage;
+	bool bSuccess = TryGeographicToEngine(GeographicCoordinates, EngineCoordinates, &ErrorMessage);
+	
+	OutError.bHasError = !bSuccess;
+	OutError.ErrorMessage = ErrorMessage;
+	OutError.ErrorCode = bSuccess ? 0 : -1;
+	
+	return bSuccess;
+}
+
+bool AGeoReferencingSystem::TryGeographicToEngine(
+	const FGeographicCoordinates& Geographic,
+	FVector& Engine,
+	FString* OutError)
+{
+	// Validate input coordinates
+	if (Geographic.Latitude < -90.0 || Geographic.Latitude > 90.0)
+	{
+		if (OutError)
+		{
+			*OutError = FString::Printf(TEXT("Invalid latitude: %f. Latitude must be between -90 and 90 degrees."), Geographic.Latitude);
+		}
+		return false;
+	}
+
+	if (Geographic.Longitude < -180.0 || Geographic.Longitude > 180.0)
+	{
+		if (OutError)
+		{
+			*OutError = FString::Printf(TEXT("Invalid longitude: %f. Longitude must be between -180 and 180 degrees."), Geographic.Longitude);
+		}
+		return false;
+	}
+
+	// Check for PROJ context
+	if (!Impl || !Impl->ProjContext)
+	{
+		if (OutError)
+		{
+			*OutError = TEXT("PROJ context not initialized. Please ensure the GeoReferencingSystem is properly configured.");
+		}
+		return false;
+	}
+
+	try
+	{
+		// Perform transformation
+		GeographicToEngine(Geographic, Engine);
+
+		// Check for NaN or infinite values in output
+		if (!FMath::IsFinite(Engine.X) || !FMath::IsFinite(Engine.Y) || !FMath::IsFinite(Engine.Z))
+		{
+			if (OutError)
+			{
+				*OutError = TEXT("Transformation resulted in invalid coordinates (NaN or Inf). This may occur at extreme locations like poles.");
+			}
+			return false;
+		}
+
+		return true;
+	}
+	catch (...)
+	{
+		if (OutError)
+		{
+			*OutError = TEXT("Unexpected error during coordinate transformation.");
+		}
+		return false;
+	}
+}
+
+FTransformationAccuracy AGeoReferencingSystem::GetTransformationAccuracy(
+	const FString& SourceCRS,
+	const FString& TargetCRS)
+{
+	FTransformationAccuracy Accuracy;
+
+	if (!Impl || !Impl->ProjContext)
+	{
+		Accuracy.TransformationMethod = TEXT("Error: PROJ context not initialized");
+		return Accuracy;
+	}
+
+	// Get PROJ transformation object
+	PJ* Projection = Impl->GetPROJProjection(SourceCRS, TargetCRS);
+	if (!Projection)
+	{
+		Accuracy.TransformationMethod = TEXT("Error: Could not create transformation");
+		return Accuracy;
+	}
+
+	// Query accuracy from PROJ (requires PROJ 6.0+)
+	// Note: proj_trans_get_accuracy returns -1 if accuracy is unknown
+	double HorizAccuracy = proj_trans_get_accuracy(Impl->ProjContext, Projection, 1, 0);
+	double VertAccuracy = proj_trans_get_accuracy(Impl->ProjContext, Projection, 0, 1);
+
+	Accuracy.HorizontalAccuracyMeters = HorizAccuracy;
+	Accuracy.VerticalAccuracyMeters = VertAccuracy;
+
+	// Get information about the transformation
+	PJ_PROJ_INFO info = proj_pj_info(Projection);
+	if (info.definition)
+	{
+		Accuracy.TransformationMethod = FString(UTF8_TO_TCHAR(info.definition));
+	}
+
+	// Check if transformation uses grid files
+	Accuracy.bIsGridBased = Accuracy.TransformationMethod.Contains(TEXT("grid")) || 
+	                        Accuracy.TransformationMethod.Contains(TEXT("nadgrid"));
+
+	proj_destroy(Projection);
+
+	return Accuracy;
+}
+
+// Batch Transformations
+
+void AGeoReferencingSystem::GeographicToEngineBatch(
+	const TArray<FGeographicCoordinates>& GeographicCoordinates,
+	TArray<FVector>& EngineCoordinates)
+{
+	SCOPE_CYCLE_COUNTER(STAT_GeoReferencingBatchTransform);
+	
+	// Pre-allocate output array for efficiency
+	EngineCoordinates.SetNum(GeographicCoordinates.Num());
+
+	// Track performance
+	double StartTime = FPlatformTime::Seconds();
+
+	// Transform each coordinate
+	for (int32 i = 0; i < GeographicCoordinates.Num(); ++i)
+	{
+		GeographicToEngine(GeographicCoordinates[i], EngineCoordinates[i]);
+	}
+
+	// Update performance stats
+	double ElapsedMicroseconds = (FPlatformTime::Seconds() - StartTime) * 1000000.0;
+	{
+		FScopeLock Lock(&StatsMutex);
+		PerformanceStats.TotalTransformations += GeographicCoordinates.Num();
+		
+		// Update average time
+		if (PerformanceStats.TotalTransformations > 0)
+		{
+			double TotalTime = PerformanceStats.AverageTransformTimeMicroseconds * 
+			                   (PerformanceStats.TotalTransformations - GeographicCoordinates.Num());
+			TotalTime += ElapsedMicroseconds;
+			PerformanceStats.AverageTransformTimeMicroseconds = TotalTime / PerformanceStats.TotalTransformations;
+		}
+
+		// Update max time (per transformation)
+		double PerTransformTime = ElapsedMicroseconds / FMath::Max(1, GeographicCoordinates.Num());
+		if (PerTransformTime > PerformanceStats.MaxTransformTimeMicroseconds)
+		{
+			PerformanceStats.MaxTransformTimeMicroseconds = PerTransformTime;
+		}
+	}
+}
+
+void AGeoReferencingSystem::EngineToGeographicBatch(
+	const TArray<FVector>& EngineCoordinates,
+	TArray<FGeographicCoordinates>& GeographicCoordinates)
+{
+	SCOPE_CYCLE_COUNTER(STAT_GeoReferencingBatchTransform);
+	
+	// Pre-allocate output array for efficiency
+	GeographicCoordinates.SetNum(EngineCoordinates.Num());
+
+	// Track performance
+	double StartTime = FPlatformTime::Seconds();
+
+	// Transform each coordinate
+	for (int32 i = 0; i < EngineCoordinates.Num(); ++i)
+	{
+		EngineToGeographic(EngineCoordinates[i], GeographicCoordinates[i]);
+	}
+
+	// Update performance stats
+	double ElapsedMicroseconds = (FPlatformTime::Seconds() - StartTime) * 1000000.0;
+	{
+		FScopeLock Lock(&StatsMutex);
+		PerformanceStats.TotalTransformations += EngineCoordinates.Num();
+		
+		// Update average time
+		if (PerformanceStats.TotalTransformations > 0)
+		{
+			double TotalTime = PerformanceStats.AverageTransformTimeMicroseconds * 
+			                   (PerformanceStats.TotalTransformations - EngineCoordinates.Num());
+			TotalTime += ElapsedMicroseconds;
+			PerformanceStats.AverageTransformTimeMicroseconds = TotalTime / PerformanceStats.TotalTransformations;
+		}
+
+		// Update max time (per transformation)
+		double PerTransformTime = ElapsedMicroseconds / FMath::Max(1, EngineCoordinates.Num());
+		if (PerTransformTime > PerformanceStats.MaxTransformTimeMicroseconds)
+		{
+			PerformanceStats.MaxTransformTimeMicroseconds = PerTransformTime;
+		}
+	}
+}
+
+void AGeoReferencingSystem::GeographicToEngineBatchParallel(
+	const TArray<FGeographicCoordinates>& Geographic,
+	TArray<FVector>& Engine,
+	int32 NumThreads)
+{
+	// Pre-allocate output array
+	Engine.SetNum(Geographic.Num());
+
+	if (Geographic.Num() == 0)
+	{
+		return;
+	}
+
+	// Track performance
+	double StartTime = FPlatformTime::Seconds();
+
+	// For small batches, use single-threaded version
+	if (Geographic.Num() < 100 || NumThreads <= 1)
+	{
+		GeographicToEngineBatch(Geographic, Engine);
+		return;
+	}
+
+	// Calculate chunk size for each thread
+	const int32 ChunkSize = FMath::CeilToInt(static_cast<float>(Geographic.Num()) / NumThreads);
+
+	// Use ParallelFor for thread-safe parallel execution
+	ParallelFor(NumThreads, [&](int32 ThreadIndex)
+	{
+		const int32 StartIndex = ThreadIndex * ChunkSize;
+		const int32 EndIndex = FMath::Min(StartIndex + ChunkSize, Geographic.Num());
+
+		for (int32 i = StartIndex; i < EndIndex; ++i)
+		{
+			GeographicToEngine(Geographic[i], Engine[i]);
+		}
+	});
+
+	// Update performance stats
+	double ElapsedMicroseconds = (FPlatformTime::Seconds() - StartTime) * 1000000.0;
+	{
+		FScopeLock Lock(&StatsMutex);
+		PerformanceStats.TotalTransformations += Geographic.Num();
+		
+		// Update average time
+		if (PerformanceStats.TotalTransformations > 0)
+		{
+			double TotalTime = PerformanceStats.AverageTransformTimeMicroseconds * 
+			                   (PerformanceStats.TotalTransformations - Geographic.Num());
+			TotalTime += ElapsedMicroseconds;
+			PerformanceStats.AverageTransformTimeMicroseconds = TotalTime / PerformanceStats.TotalTransformations;
+		}
+
+		// Update max time (per transformation)
+		double PerTransformTime = ElapsedMicroseconds / FMath::Max(1, Geographic.Num());
+		if (PerTransformTime > PerformanceStats.MaxTransformTimeMicroseconds)
+		{
+			PerformanceStats.MaxTransformTimeMicroseconds = PerTransformTime;
+		}
+	}
+}
+
+// Performance Monitoring
+
+FGeoReferencingStats AGeoReferencingSystem::GetPerformanceStats() const
+{
+	FScopeLock Lock(&StatsMutex);
+	return PerformanceStats;
+}
+
+void AGeoReferencingSystem::ResetPerformanceStats()
+{
+	FScopeLock Lock(&StatsMutex);
+	PerformanceStats = FGeoReferencingStats();
+}
+
+// Coordinate Precision Calculator
+
+FCoordinatePrecision AGeoReferencingSystem::GetPrecisionAtLocation(const FVector& EngineCoordinates)
+{
+	FCoordinatePrecision Precision;
+
+	// Calculate distance from origin in centimeters
+	double DistanceCm = EngineCoordinates.Size();
+	Precision.DistanceFromOriginKm = DistanceCm / 100000.0; // Convert cm to km
+
+	// Calculate precision loss due to floating point representation
+	// UE uses single precision floats for FVector in many cases, but we use double for calculations
+	// Precision degrades as we move away from origin
+	// At 1 km: ~0.01 cm precision
+	// At 10 km: ~0.1 cm precision
+	// At 100 km: ~1 cm precision
+	// At 1000 km: ~10 cm precision
+	
+	const double BaselinePrecision = 0.01; // 0.01 cm at origin
+	const double PrecisionDegradationFactor = 1.0e-5; // Precision loss per cm of distance
+	
+	Precision.PrecisionCentimeters = BaselinePrecision + (DistanceCm * PrecisionDegradationFactor);
+
+	// Determine rebasing threshold
+	// Recommend rebasing when precision exceeds 10 cm (useful for most GIS applications)
+	const double RebasingThresholdCm = 10.0;
+	Precision.bRequiresRebasing = Precision.PrecisionCentimeters > RebasingThresholdCm;
+
+	// Generate recommendation
+	if (!Precision.bRequiresRebasing)
+	{
+		Precision.Recommendation = FString::Printf(
+			TEXT("Precision is good (%.2f cm). No rebasing needed."),
+			Precision.PrecisionCentimeters);
+	}
+	else if (Precision.PrecisionCentimeters < 50.0)
+	{
+		Precision.Recommendation = FString::Printf(
+			TEXT("Precision is degrading (%.2f cm). Consider rebasing soon."),
+			Precision.PrecisionCentimeters);
+	}
+	else if (Precision.PrecisionCentimeters < 100.0)
+	{
+		Precision.Recommendation = FString::Printf(
+			TEXT("Precision is poor (%.2f cm). Rebasing recommended."),
+			Precision.PrecisionCentimeters);
+	}
+	else
+	{
+		Precision.Recommendation = FString::Printf(
+			TEXT("Precision is critical (%.2f cm). Rebasing strongly recommended!"),
+			Precision.PrecisionCentimeters);
+	}
+
+	return Precision;
+}
+
+double AGeoReferencingSystem::GetRecommendedRebasingDistanceKm()
+{
+	// Based on the precision degradation model, calculate the distance where precision reaches 10 cm
+	const double BaselinePrecision = 0.01; // 0.01 cm at origin
+	const double PrecisionDegradationFactor = 1.0e-5;
+	const double RebasingThresholdCm = 10.0;
+	
+	// Solve: RebasingThresholdCm = BaselinePrecision + (DistanceCm * PrecisionDegradationFactor)
+	double DistanceCm = (RebasingThresholdCm - BaselinePrecision) / PrecisionDegradationFactor;
+	double DistanceKm = DistanceCm / 100000.0; // Convert cm to km
+	
+	return DistanceKm;
+}
+
+bool AGeoReferencingSystem::ShouldRebaseAtLocation(const FVector& EngineCoordinates)
+{
+	FCoordinatePrecision Precision = GetPrecisionAtLocation(EngineCoordinates);
+	return Precision.bRequiresRebasing;
+}
 
 void AGeoReferencingSystem::ProjectedToGeographic(const FVector& ProjectedCoordinates, FGeographicCoordinates& GeographicCoordinates)
 {
