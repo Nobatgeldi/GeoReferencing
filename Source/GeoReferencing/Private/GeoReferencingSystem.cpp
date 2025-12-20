@@ -483,12 +483,17 @@ FTransformationAccuracy AGeoReferencingSystem::GetTransformationAccuracy(
 		Accuracy.TransformationMethod = TEXT("Error: Could not create transformation");
 		return Accuracy;
 	}
-
+	double HorizAccuracy = -1.0;
+	double VertAccuracy = -1.0;
 	// Query accuracy from PROJ (requires PROJ 6.0+)
 	// Note: proj_trans_get_accuracy returns -1 if accuracy is unknown
-	double HorizAccuracy = proj_trans_get_accuracy(Impl->ProjContext, Projection, 1, 0);
-	double VertAccuracy = proj_trans_get_accuracy(Impl->ProjContext, Projection, 0, 1);
+#if defined(PROJ_VERSION_MAJOR) && PROJ_VERSION_MAJOR >= 9
+	HorizAccuracy = VertAccuracy= proj_coordoperation_get_accuracy(Impl->ProjContext, Projection);
+#else
+	// proj_trans_get_accuracy not available in this PROJ version — leave as -1 (unknown)
+	UE_LOG(LogGeoReferencing, Verbose, TEXT("proj_trans_get_accuracy not available in this PROJ build; returning unknown accuracy"));
 
+#endif
 	Accuracy.HorizontalAccuracyMeters = HorizAccuracy;
 	Accuracy.VerticalAccuracyMeters = VertAccuracy;
 

@@ -10,7 +10,7 @@
 // Double precision structures
 #include "GeographicCoordinates.h"
 #include "Ellipsoid.h"
-
+#include "TransformationAccuracy.h"
 #include "GeoReferencingSystem.generated.h"
 
 
@@ -29,38 +29,6 @@ enum class EPlanetShape : uint8 {
 	 * You might need dynamic rebasing to avoid precision issues at large scales.
 	 */
 	 RoundPlanet UMETA(DisplayName = "Round Planet"),
-};
-
-/**
- * Structure containing information about the accuracy of a coordinate transformation
- */
-USTRUCT(BlueprintType)
-struct GEOREFERENCING_API FTransformationAccuracy
-{
-	GENERATED_BODY()
-
-	/** Horizontal accuracy of the transformation in meters */
-	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
-	double HorizontalAccuracyMeters = -1.0;
-
-	/** Vertical accuracy of the transformation in meters */
-	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
-	double VerticalAccuracyMeters = -1.0;
-
-	/** Whether the transformation uses a grid-based method */
-	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
-	bool bIsGridBased = false;
-
-	/** Description of the transformation method used */
-	UPROPERTY(BlueprintReadOnly, Category = "GeoReferencing")
-	FString TransformationMethod;
-
-	FTransformationAccuracy()
-		: HorizontalAccuracyMeters(-1.0)
-		, VerticalAccuracyMeters(-1.0)
-		, bIsGridBased(false)
-	{
-	}
 };
 
 /**
