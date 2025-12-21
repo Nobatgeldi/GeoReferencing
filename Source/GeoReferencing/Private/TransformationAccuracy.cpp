@@ -9,10 +9,11 @@ FText FTransformationAccuracy::ToFullText(double HAccuracyMeters, double VAccura
 	FNumberFormattingOptions NumberFormatOptions = FNumberFormattingOptions::DefaultNoGrouping();
 	FFormatNamedArguments Args;
 
-	// Use struct members if parameters have default values, otherwise use parameters
-	double HorizAccuracy = (HAccuracyMeters == 0) ? HorizontalAccuracyMeters : HAccuracyMeters;
-	double VertAccuracy = (VAccuracyMeters == 0) ? VerticalAccuracyMeters : VAccuracyMeters;
-	bool GridBased = (HAccuracyMeters == 0 && VAccuracyMeters == 0) ? bIsGridBased : IsGridBased;
+	// Use struct members if parameters are at default (-1.0), otherwise use parameters
+	double HorizAccuracy = (HAccuracyMeters < 0) ? HorizontalAccuracyMeters : HAccuracyMeters;
+	double VertAccuracy = (VAccuracyMeters < 0) ? VerticalAccuracyMeters : VAccuracyMeters;
+	// If both accuracy parameters are defaults (< 0), use struct member for boolean too
+	bool GridBased = (HAccuracyMeters < 0 && VAccuracyMeters < 0) ? bIsGridBased : IsGridBased;
 
 	// Set decimal precision for accuracy values
 	NumberFormatOptions.MinimumFractionalDigits = 2;
@@ -49,10 +50,11 @@ FText FTransformationAccuracy::ToCompactText(double HAccuracyMeters, double VAcc
 	FNumberFormattingOptions NumberFormatOptions = FNumberFormattingOptions::DefaultNoGrouping();
 	FFormatNamedArguments Args;
 
-	// Use struct members if parameters have default values, otherwise use parameters
-	double HorizAccuracy = (HAccuracyMeters == 0) ? HorizontalAccuracyMeters : HAccuracyMeters;
-	double VertAccuracy = (VAccuracyMeters == 0) ? VerticalAccuracyMeters : VAccuracyMeters;
-	bool GridBased = (HAccuracyMeters == 0 && VAccuracyMeters == 0) ? bIsGridBased : IsGridBased;
+	// Use struct members if parameters are at default (-1.0), otherwise use parameters
+	double HorizAccuracy = (HAccuracyMeters < 0) ? HorizontalAccuracyMeters : HAccuracyMeters;
+	double VertAccuracy = (VAccuracyMeters < 0) ? VerticalAccuracyMeters : VAccuracyMeters;
+	// If both accuracy parameters are defaults (< 0), use struct member for boolean too
+	bool GridBased = (HAccuracyMeters < 0 && VAccuracyMeters < 0) ? bIsGridBased : IsGridBased;
 
 	// Set decimal precision for accuracy values
 	NumberFormatOptions.MinimumFractionalDigits = 2;
