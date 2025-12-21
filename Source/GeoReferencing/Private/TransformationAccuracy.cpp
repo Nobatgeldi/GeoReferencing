@@ -25,7 +25,7 @@ FText FTransformationAccuracy::ToFullText(double HAccuracyMeters, double VAccura
 	}
 	else
 	{
-		Args.Add(TEXT("HAccuracyMeters"), FText::Format(NSLOCTEXT("GeoReferencing", "AccuracyMeters", "{0}m"), FText::AsNumber(HorizAccuracy, &NumberFormatOptions)));
+		Args.Add(TEXT("HAccuracyMeters"), FText::AsNumber(HorizAccuracy, &NumberFormatOptions));
 	}
 	
 	if (VertAccuracy < 0)
@@ -34,14 +34,14 @@ FText FTransformationAccuracy::ToFullText(double HAccuracyMeters, double VAccura
 	}
 	else
 	{
-		Args.Add(TEXT("VAccuracyMeters"), FText::Format(NSLOCTEXT("GeoReferencing", "AccuracyMeters", "{0}m"), FText::AsNumber(VertAccuracy, &NumberFormatOptions)));
+		Args.Add(TEXT("VAccuracyMeters"), FText::AsNumber(VertAccuracy, &NumberFormatOptions));
 	}
 	
 	// Format grid-based flag as text
 	Args.Add(TEXT("IsGridBased"), GridBased ? NSLOCTEXT("GeoReferencing", "GridBased", "Yes") : NSLOCTEXT("GeoReferencing", "NotGridBased", "No"));
 
 	return FText::Format(NSLOCTEXT("GeoReferencing", "TransformationAccuracyFullText", 
-		"Horizontal Accuracy: {HAccuracyMeters}, Vertical Accuracy: {VAccuracyMeters}, Grid-Based: {IsGridBased}"), Args);
+		"Horizontal Accuracy: {HAccuracyMeters}m, Vertical Accuracy: {VAccuracyMeters}m, Grid-Based: {IsGridBased}"), Args);
 }
 
 FText FTransformationAccuracy::ToCompactText(double HAccuracyMeters, double VAccuracyMeters, bool IsGridBased)
