@@ -52,11 +52,11 @@ public:
 	 * Unknown accuracy values (-1.0) are displayed as "?"
 	 * @param HAccuracyMeters Optional override for horizontal accuracy (-1.0 uses struct member HorizontalAccuracyMeters)
 	 * @param VAccuracyMeters Optional override for vertical accuracy (-1.0 uses struct member VerticalAccuracyMeters)  
-	 * @param IsGridBased Optional override for grid-based flag (used when any accuracy parameter is overridden)
+	 * @param bIsGridBased Optional override for grid-based flag (used when any accuracy parameter is overridden)
 	 * @return Formatted text suitable for compact UI display
 	 * @note Call without parameters to format the struct's member values
 	 */
-	FText ToCompactText(double HAccuracyMeters = -1.0, double VAccuracyMeters = -1.0, bool IsGridBased = false);
+	FText ToCompactText(double HAccuracyMeters = -1.0, double VAccuracyMeters = -1.0, bool bIsGridBased = false);
 	
 	/**
 	 * Converts the transformation accuracy to full formatted text.
@@ -64,11 +64,11 @@ public:
 	 * Unknown accuracy values (-1.0) are displayed as "Unknown"
 	 * @param HAccuracyMeters Optional override for horizontal accuracy (-1.0 uses struct member HorizontalAccuracyMeters)
 	 * @param VAccuracyMeters Optional override for vertical accuracy (-1.0 uses struct member VerticalAccuracyMeters)
-	 * @param IsGridBased Optional override for grid-based flag (used when any accuracy parameter is overridden)
+	 * @param bIsGridBased Optional override for grid-based flag (used when any accuracy parameter is overridden)
 	 * @return Formatted text with full labels
 	 * @note Call without parameters to format the struct's member values
 	 */
-	FText ToFullText(double HAccuracyMeters = -1.0, double VAccuracyMeters = -1.0, bool IsGridBased = false);
+	FText ToFullText(double HAccuracyMeters = -1.0, double VAccuracyMeters = -1.0, bool bIsGridBased = false);
 
 };
 
