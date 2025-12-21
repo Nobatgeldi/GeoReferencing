@@ -46,8 +46,29 @@ public:
 	{
 	}
 
-	FText ToCompactText(double HAccuracyMeters = 0, double VAccuracyMeters = 0, bool IsGridBased = false);
-	FText ToFullText(double HAccuracyMeters = 0, double VAccuracyMeters = 0, bool IsGridBased = false);
+	/**
+	 * Converts the transformation accuracy to compact formatted text.
+	 * Format: "Acc: (Xm, Ym) [G/D]" where G=Grid-based, D=Direct
+	 * Unknown accuracy values (-1.0) are displayed as "?"
+	 * @param HAccuracyMeters Optional override for horizontal accuracy (-1.0 uses struct member HorizontalAccuracyMeters)
+	 * @param VAccuracyMeters Optional override for vertical accuracy (-1.0 uses struct member VerticalAccuracyMeters)  
+	 * @param bIsGridBased Optional override for grid-based flag (used when any accuracy parameter is overridden)
+	 * @return Formatted text suitable for compact UI display
+	 * @note Call without parameters to format the struct's member values
+	 */
+	FText ToCompactText(double HAccuracyMeters = -1.0, double VAccuracyMeters = -1.0, bool bIsGridBased = false);
+	
+	/**
+	 * Converts the transformation accuracy to full formatted text.
+	 * Format: "Horizontal Accuracy: Xm, Vertical Accuracy: Ym, Grid-Based: Yes/No"
+	 * Unknown accuracy values (-1.0) are displayed as "Unknown"
+	 * @param HAccuracyMeters Optional override for horizontal accuracy (-1.0 uses struct member HorizontalAccuracyMeters)
+	 * @param VAccuracyMeters Optional override for vertical accuracy (-1.0 uses struct member VerticalAccuracyMeters)
+	 * @param bIsGridBased Optional override for grid-based flag (used when any accuracy parameter is overridden)
+	 * @return Formatted text with full labels
+	 * @note Call without parameters to format the struct's member values
+	 */
+	FText ToFullText(double HAccuracyMeters = -1.0, double VAccuracyMeters = -1.0, bool bIsGridBased = false);
 
 };
 
@@ -56,7 +77,13 @@ class GEOREFERENCING_API UTransformationAccuracyFunctionLibrary : public UBluepr
 {
 	GENERATED_BODY()
 	/**
-	 * Converts a GeographicCoordinates value to localized formatted text, in the form 'X= Y= Z='
+	 * Converts a TransformationAccuracy value to localized formatted text, displaying horizontal accuracy, 
+	 * vertical accuracy, and whether the transformation is grid-based.
+	 * Format: "Horizontal Accuracy: Xm, Vertical Accuracy: Ym, Grid-Based: Yes/No"
+	 * @param TransformationAccuracy The accuracy information to format
+	 * @param HorizontalAccuracyMeters Optional override for horizontal accuracy (-1.0 to use struct value)
+	 * @param VerticalAccuracyMeters Optional override for vertical accuracy (-1.0 to use struct value)
+	 * @param bIsGridBased Optional override for grid-based flag
 	 **/
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "ToFullText", AdvancedDisplay = "1", BlueprintAutocast), Category = "GeoReferencing")
 	static inline FText ToFullText(UPARAM(ref) FTransformationAccuracy& TransformationAccuracy, double HorizontalAccuracyMeters = -1.0, double VerticalAccuracyMeters = -1.0, bool bIsGridBased = false)
@@ -65,7 +92,12 @@ class GEOREFERENCING_API UTransformationAccuracyFunctionLibrary : public UBluepr
 	}
 
 	/**
-	 * Converts a GeographicCoordinates value to formatted text, in the form '(X, Y, Z)'
+	 * Converts a TransformationAccuracy value to compact formatted text, suitable for UI display.
+	 * Format: "Acc: (Xm, Ym) [G/D]" where G=Grid-based, D=Direct
+	 * @param TransformationAccuracy The accuracy information to format
+	 * @param HorizontalAccuracyMeters Optional override for horizontal accuracy (-1.0 to use struct value)
+	 * @param VerticalAccuracyMeters Optional override for vertical accuracy (-1.0 to use struct value)
+	 * @param bIsGridBased Optional override for grid-based flag
 	 **/
 	UFUNCTION(BlueprintPure, meta = (DisplayName = "ToCompactText", AdvancedDisplay = "1", BlueprintAutocast), Category = "GeoReferencing")
 	static inline FText ToCompactText(UPARAM(ref) FTransformationAccuracy& TransformationAccuracy, double HorizontalAccuracyMeters = -1.0, double VerticalAccuracyMeters = -1.0, bool bIsGridBased = false)
