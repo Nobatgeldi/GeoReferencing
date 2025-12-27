@@ -4,7 +4,7 @@
 #include "TransformationAccuracy.h"
 #include "MathUtil.h"
 
-FText FTransformationAccuracy::ToFullText(double HAccuracyMeters, double VAccuracyMeters, bool bIsGridBased)
+FText FTransformationAccuracy::ToFullText(double HAccuracyMeters, double VAccuracyMeters, bool IsGridBased)
 {
 	FNumberFormattingOptions NumberFormatOptions = FNumberFormattingOptions::DefaultNoGrouping();
 	FFormatNamedArguments Args;
@@ -14,7 +14,7 @@ FText FTransformationAccuracy::ToFullText(double HAccuracyMeters, double VAccura
 	double VertAccuracy = (VAccuracyMeters < 0) ? VerticalAccuracyMeters : VAccuracyMeters;
 	// If both accuracy parameters are defaults (< 0), use struct member for boolean too
 	// Note: parameter name shadows member name, so use this-> to access member
-	bool GridBased = (HAccuracyMeters < 0 && VAccuracyMeters < 0) ? this->bIsGridBased : bIsGridBased;
+	bool GridBased = (HAccuracyMeters < 0 && VAccuracyMeters < 0) ? this->bIsGridBased : IsGridBased;
 
 	// Set decimal precision for accuracy values
 	NumberFormatOptions.MinimumFractionalDigits = 2;
@@ -46,7 +46,7 @@ FText FTransformationAccuracy::ToFullText(double HAccuracyMeters, double VAccura
 		"Horizontal Accuracy: {HAccuracyMeters}m, Vertical Accuracy: {VAccuracyMeters}m, Grid-Based: {IsGridBased}"), Args);
 }
 
-FText FTransformationAccuracy::ToCompactText(double HAccuracyMeters, double VAccuracyMeters, bool bIsGridBased)
+FText FTransformationAccuracy::ToCompactText(double HAccuracyMeters, double VAccuracyMeters, bool IsGridBased)
 {
 	FNumberFormattingOptions NumberFormatOptions = FNumberFormattingOptions::DefaultNoGrouping();
 	FFormatNamedArguments Args;
@@ -56,7 +56,7 @@ FText FTransformationAccuracy::ToCompactText(double HAccuracyMeters, double VAcc
 	double VertAccuracy = (VAccuracyMeters < 0) ? VerticalAccuracyMeters : VAccuracyMeters;
 	// If both accuracy parameters are defaults (< 0), use struct member for boolean too
 	// Note: parameter name shadows member name, so use this-> to access member
-	bool GridBased = (HAccuracyMeters < 0 && VAccuracyMeters < 0) ? this->bIsGridBased : bIsGridBased;
+	bool GridBased = (HAccuracyMeters < 0 && VAccuracyMeters < 0) ? this->bIsGridBased : IsGridBased;
 
 	// Set decimal precision for accuracy values
 	NumberFormatOptions.MinimumFractionalDigits = 2;
