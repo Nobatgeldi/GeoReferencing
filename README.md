@@ -95,6 +95,8 @@ The GeoReferencing plugin provides tools to establish a correspondence between U
 - **Precision Calculator**: Analyze coordinate precision and get rebasing recommendations
 - **Professional Workflows**: Seamless integration with QGIS, ArcGIS, and other GIS tools
 
+📖 **[GeoJSON & GeoTIFF Loading Guide](docs/GEOJSON_LOADER.md)** – C++ and Blueprint examples for loading and exporting GeoJSON data
+
 **See**: [Implemented Features Documentation](docs/IMPLEMENTED_FEATURES.md) for complete API reference
 
 ### Platform Support
