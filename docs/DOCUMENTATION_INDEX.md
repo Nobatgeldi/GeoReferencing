@@ -7,6 +7,7 @@ Welcome to the GeoReferencing plugin documentation. This index will help you fin
 - 🚀 **New User?** Start with [QUICKSTART.md](QUICKSTART.md) - Get up and running in 5 minutes
 - 📖 **Full Guide** [README.md](README.md) - Complete documentation with all features
 - 💻 **Developer?** See [API.md](API.md) - Full API reference for C++ and Blueprint
+- 🗺️ **GeoJSON/GeoTIFF?** See [GEOJSON_LOADER.md](GEOJSON_LOADER.md) - C++ and Blueprint loading guide
 - 🤝 **Contributing?** Read [CONTRIBUTING.md](CONTRIBUTING.md) - Guidelines for contributors
 - 📋 **Version Info** [CHANGELOG.md](CHANGELOG.md) - Version history and changes
 
@@ -75,6 +76,26 @@ Welcome to the GeoReferencing plugin documentation. This index will help you fin
 - Blueprint developers
 - API integration
 - Advanced usage patterns
+
+#### [GEOJSON_LOADER.md](GEOJSON_LOADER.md) - GeoJSON & GeoTIFF Loading Guide
+**Dedicated guide for importing and exporting GeoJSON data**
+
+**Contents:**
+- What is GeoJSON and supported geometry types
+- UGeoJSONReader and UGeoJSONWriter class reference
+- C++ code examples (load file, load string, export, full pipeline)
+- Blueprint node-by-node examples with diagrams
+- GeoJSON file format reference with samples
+- Error handling patterns
+- Coordinate order convention explained
+- GeoTIFF status and planned Phase 4 features
+- Frequently Asked Questions
+
+**Best For:**
+- Loading GIS data exported from QGIS or ArcGIS
+- Placing actors from geographic coordinates
+- Sending/receiving GeoJSON over HTTP
+- C++ and Blueprint developers working with GeoJSON
 
 #### [CONTRIBUTING.md](CONTRIBUTING.md) - Contributor Guide (11 KB)
 **Everything you need to contribute to the project**
@@ -146,6 +167,9 @@ Welcome to the GeoReferencing plugin documentation. This index will help you fin
 **Fix coordinate conversion issues**
 → [README.md](README.md) Troubleshooting section
 
+**Load or export GeoJSON data in C++ or Blueprint**
+→ [GEOJSON_LOADER.md](GEOJSON_LOADER.md) dedicated guide
+
 **Understand coordinate systems**
 → [README.md](README.md) Core Concepts section
 
@@ -163,14 +187,16 @@ Welcome to the GeoReferencing plugin documentation. This index will help you fin
 
 ## Documentation Statistics
 
-- **Total Files**: 6 documentation files
-- **Total Lines**: 2,184 lines
-- **Total Size**: ~80 KB
-- **Main Docs**: ~70 KB (README, API, QUICKSTART)
+- **Total Files**: 7 documentation files
+- **Total Lines**: ~2,600 lines
+- **Total Size**: ~100 KB
+- **Main Docs**: ~90 KB (README, API, QUICKSTART, GEOJSON_LOADER)
 - **Contributing**: ~19 KB (CONTRIBUTING, CHANGELOG)
 
 ## Key Features Documented
 
+✅ GeoJSON import/export with C++ and Blueprint examples  
+✅ GeoTIFF loading status and roadmap  
 ✅ Complete coordinate transformation system  
 ✅ Multi-CRS support (Geographic, Projected, ECEF)  
 ✅ Flat and Round Planet modes  
