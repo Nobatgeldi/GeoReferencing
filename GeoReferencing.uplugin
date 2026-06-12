@@ -4,7 +4,7 @@
 	"VersionName": "1.0",
 	"FriendlyName": "GeoReferencing",
 	"Description": "GeoReferencing tools for UE worlds",
-	"Category": "Other",
+	"Category": "Geographic Information Systems",
 	"CreatedBy": "Epic Games, Inc.",
 	"CreatedByURL": "https://epicgames.com",
 	"DocsURL": "https://github.com/Nobatgeldi/GeoReferencing/blob/main/API.md",
