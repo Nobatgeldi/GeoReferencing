@@ -30,6 +30,26 @@ echo === Bootstrapping vcpkg ===
 :: -disableMetrics in important to avoid Malwarebytes quarantine the vcpkg file. 
 call "%~dp0vcpkg\bootstrap-vcpkg.bat" -disableMetrics
 
+:: -------------------------------------------------------------------------
+:: 7-zip.org only hosts the CURRENT release now; it 404s on old version
+:: archives like 7z2107-extra.7z that this pinned vcpkg-tool version needs.
+:: Pre-seed the download cache from the official GitHub mirror (ip7z/7zip)
+:: so vcpkg.exe finds it locally and skips the dead 7-zip.org URL.
+:: -------------------------------------------------------------------------
+echo:
+echo === Pre-fetching 7zip (7-zip.org no longer hosts old versions) ===
+if not exist "%~dp0vcpkg\downloads\" mkdir "%~dp0vcpkg\downloads"
+if not exist "%~dp0vcpkg\downloads\7z2107-extra.7z" (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+        "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/ip7z/7zip/releases/download/21.07/7z2107-extra.7z' -OutFile '%~dp0vcpkg\downloads\7z2107-extra.7z'"
+    if ERRORLEVEL 1 (
+        echo:
+        echo === WARNING: could not pre-fetch 7zip from GitHub mirror, falling back to SourceForge ===
+        powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+            "$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -UseBasicParsing -Uri 'https://sourceforge.net/projects/sevenzip/files/7-Zip/21.07/7z2107-extra.7z/download' -OutFile '%~dp0vcpkg\downloads\7z2107-extra.7z'"
+    )
+)
+
 :: build for each triplet
 :: --editable leaves the source in the buildtree for easy local debugging and patch generation
 for %%x in (overlay-x64-windows overlay-x64-uwp overlay-arm64-uwp x64-android arm64-android) do (
