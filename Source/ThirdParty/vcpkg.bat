@@ -3,7 +3,7 @@
 setlocal
 
 :: this is a tag in the vcpkg repository
-set VCPKG_VERSION=2023.02.24
+set VCPKG_VERSION=2025.12.12
 
 :: this is where the artifacts get installed
 set VCPKG_INSTALLED=vcpkg-installed
