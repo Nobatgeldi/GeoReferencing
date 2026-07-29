@@ -2,8 +2,6 @@
 
 setlocal
 
-:: this is a tag in the vcpkg repository
-set VCPKG_VERSION=2026.06.24
 
 :: this is where the artifacts get installed
 set VCPKG_INSTALLED=vcpkg-installed
@@ -20,10 +18,6 @@ if exist "%~dp0vcpkg\" rmdir /s /q "%~dp0vcpkg"
 if exist "%~dp0%VCPKG_INSTALLED%\" echo:
 if exist "%~dp0%VCPKG_INSTALLED%\" echo === Tidying up %VCPKG_INSTALLED% ===
 if exist "%~dp0%VCPKG_INSTALLED%\" rmdir /s /q "%~dp0%VCPKG_INSTALLED%"
-
-echo:
-echo === Cloning vcpkg to %~dp0vcpkg ===
-git clone https://github.com/microsoft/vcpkg.git --depth 1 --branch %VCPKG_VERSION% "%~dp0vcpkg"
 
 echo:
 echo === Bootstrapping vcpkg ===
