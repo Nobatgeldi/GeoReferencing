@@ -33,7 +33,15 @@ call "%~dp0vcpkg\bootstrap-vcpkg.bat" -disableMetrics
 
 :: build for each triplet
 :: --editable leaves the source in the buildtree for easy local debugging and patch generation
-for %%x in (overlay-x64-windows overlay-x64-uwp overlay-arm64-uwp x64-android arm64-android) do (
+::
+:: NOTE: the UWP triplets (overlay-x64-uwp, overlay-arm64-uwp) are disabled.
+:: SQLite 3.53.0 discontinued Windows RT support, so the amalgamation no longer
+:: honours SQLITE_OS_WINRT and unconditionally calls desktop-only Win32 APIs
+:: (AreFileApisANSI, CreateFileA/W, GetFileSize, HeapValidate). Those are hidden
+:: by WINAPI_FAMILY_APP, which VCPKG_CMAKE_SYSTEM_NAME=WindowsStore forces.
+:: Re-enabling them requires an overlay-port pinning sqlite3 to 3.52.0 or older.
+:: The android triplets are disabled too - this project targets Win64 x64 only.
+for %%x in (overlay-x64-windows) do (
     echo:
     echo === Running vcpkg for triplet %%x ===
 	echo:
@@ -42,7 +50,7 @@ for %%x in (overlay-x64-windows overlay-x64-uwp overlay-arm64-uwp x64-android ar
 
     echo:
     echo === Reconciling %VCPKG_INSTALLED% artifacts for triplet %%x ===
-    for /f "delims=" %%f in ("%~dp0%VCPKG_INSTALLED%\%%x") do p4 reconcile "%%~ff\..."
+    where /q p4 && for /f "delims=" %%f in ("%~dp0%VCPKG_INSTALLED%\%%x") do p4 reconcile "%%~ff\..."
 )
 
 echo:
@@ -60,7 +68,7 @@ del "%~dp0..\..\Resources\PROJ\*.cmake"
 del "%~dp0..\..\Resources\PROJ\vcpkg*.*"
 
 :: reconcile in p4 (for /f will handle relative paths that p4 can't handle)
-for /f "delims=" %%f in ("%~dp0..\..\Resources\PROJ") do p4 reconcile "%%~ff\..."
+where /q p4 && for /f "delims=" %%f in ("%~dp0..\..\Resources\PROJ") do p4 reconcile "%%~ff\..."
 
 echo:
 echo === DONE ===
