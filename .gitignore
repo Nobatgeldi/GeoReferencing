@@ -75,4 +75,4 @@ Plugins/**/Intermediate/*
 DerivedDataCache/*
 Source/ThirdParty/vcpkg-installed/*
 /Source/ThirdParty/vcpkg
-/Resources
+Resources/*
