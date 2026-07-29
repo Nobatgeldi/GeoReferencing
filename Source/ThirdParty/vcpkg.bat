@@ -9,11 +9,6 @@ set VCPKG_INSTALLED=vcpkg-installed
 :: setup by Engine\Android\SetupAndroid.bat
 set ANDROID_NDK_HOME=%NDKROOT%
 
-:: cleanup the git repo
-if exist "%~dp0vcpkg\" echo:
-if exist "%~dp0vcpkg\" echo === Tidying up vcpkg ===
-if exist "%~dp0vcpkg\" rmdir /s /q "%~dp0vcpkg"
-
 :: cleanup the prior artifacts
 if exist "%~dp0%VCPKG_INSTALLED%\" echo:
 if exist "%~dp0%VCPKG_INSTALLED%\" echo === Tidying up %VCPKG_INSTALLED% ===
