@@ -437,31 +437,20 @@ bool AGeoReferencingSystem::TryGeographicToEngine(
 		return false;
 	}
 
-	try
-	{
-		// Perform transformation
-		GeographicToEngine(Geographic, Engine);
+	// Perform transformation
+	GeographicToEngine(Geographic, Engine);
 
-		// Check for NaN or infinite values in output
-		if (!FMath::IsFinite(Engine.X) || !FMath::IsFinite(Engine.Y) || !FMath::IsFinite(Engine.Z))
-		{
-			if (OutError)
-			{
-				*OutError = TEXT("Transformation resulted in invalid coordinates (NaN or Inf). This may occur at extreme locations like poles.");
-			}
-			return false;
-		}
-
-		return true;
-	}
-	catch (...)
+	// Check for NaN or infinite values in output
+	if (!FMath::IsFinite(Engine.X) || !FMath::IsFinite(Engine.Y) || !FMath::IsFinite(Engine.Z))
 	{
 		if (OutError)
 		{
-			*OutError = TEXT("Unexpected error during coordinate transformation.");
+			*OutError = TEXT("Transformation resulted in invalid coordinates (NaN or Inf). This may occur at extreme locations like poles.");
 		}
 		return false;
 	}
+
+	return true;
 }
 
 FTransformationAccuracy AGeoReferencingSystem::GetTransformationAccuracy(
